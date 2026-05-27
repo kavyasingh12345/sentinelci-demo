@@ -11,16 +11,16 @@ def _build_markdown_report(state: ScanState) -> str:
     hitl_decision = state.get("hitl_decision")
 
     if score <= 2:
-        badge = "🟢 PASSED"
+        badge = "[PASSED]"
         color_label = "Clean"
     elif score <= 5:
-        badge = "🟡 WARNING"
+        badge = "[WARNING]"
         color_label = "Review Recommended"
     elif score <= 8:
-        badge = "🔴 HIGH RISK"
+        badge = "[HIGH RISK]"
         color_label = "Block Until Reviewed"
     else:
-        badge = "⛔ CRITICAL"
+        badge = "[CRITICAL]"
         color_label = "Auto-Blocked"
 
     lines = [
@@ -30,10 +30,10 @@ def _build_markdown_report(state: ScanState) -> str:
         f"",
         f"| Severity | Count |",
         f"|----------|-------|",
-        f"| 🔴 Critical | {breakdown.get('critical', 0)} |",
-        f"| 🟠 High | {breakdown.get('high', 0)} |",
-        f"| 🟡 Medium | {breakdown.get('medium', 0)} |",
-        f"| 🟢 Low | {breakdown.get('low', 0)} |",
+        f"| Critical | {breakdown.get('critical', 0)} |",
+        f"| High | {breakdown.get('high', 0)} |",
+        f"| Medium | {breakdown.get('medium', 0)} |",
+        f"| Low | {breakdown.get('low', 0)} |",
         f"",
         f"## AI Analysis",
         f"{state.get('ai_analysis', 'No analysis available.')}",
@@ -43,7 +43,7 @@ def _build_markdown_report(state: ScanState) -> str:
     if remediations:
         lines.append("## Findings & Remediation")
         for i, finding in enumerate(remediations, 1):
-            sev_icon = {"CRITICAL": "🔴", "HIGH": "🟠", "MEDIUM": "🟡", "LOW": "🟢", "INFO": "ℹ️"}.get(finding.get("severity", ""), "•")
+            sev_icon = {"CRITICAL": "[!]", "HIGH": "[H]", "MEDIUM": "[M]", "LOW": "[L]", "INFO": "[I]"}.get(finding.get("severity", ""), "•")
             exploitable = "⚠️ Exploitable" if finding.get("is_exploitable") else "ℹ️ Low risk"
             lines += [
                 f"### {i}. {sev_icon} {finding.get('severity')} — `{finding.get('filename', 'unknown')}`",

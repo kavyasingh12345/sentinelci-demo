@@ -9,6 +9,11 @@ from state import ScanRequest, HITLResponse
 from graph import app_graph
 from config import WEBHOOK_SECRET
 
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 app = FastAPI(title="SentinelCI", version="1.0.0")
 
 app.add_middleware(

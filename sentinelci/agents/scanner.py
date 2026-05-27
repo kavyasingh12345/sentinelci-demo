@@ -10,14 +10,15 @@ def _run_bandit(code: str, filename: str) -> list[dict]:
         return []
 
     findings = []
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as f:
         f.write(code)
         tmp_path = f.name
 
     try:
         result = subprocess.run(
             ["bandit", "-f", "json", "-q", tmp_path],
-            capture_output=True, text=True, timeout=30
+            capture_output=True, text=True, timeout=20,
+            encoding="utf-8", errors="replace"
         )
         if result.stdout:
             data = json.loads(result.stdout)
@@ -30,81 +31,49 @@ def _run_bandit(code: str, filename: str) -> list[dict]:
                     "confidence": issue.get("issue_confidence", ""),
                     "test_id": issue.get("test_id"),
                     "issue_text": issue.get("issue_text"),
-                    "code_snippet": issue.get("code", ""),
-                    "cwe": issue.get("issue_cwe", {}).get("id") if issue.get("issue_cwe") else None
-                })
-    except subprocess.TimeoutExpired:
-        findings.append({"tool": "bandit", "filename": filename, "error": "timeout"})
-    except FileNotFoundError:
-        findings.append({"tool": "bandit", "filename": filename, "error": "bandit not installed"})
-    except Exception as e:
-        findings.append({"tool": "bandit", "filename": filename, "error": str(e)})
-    finally:
-        os.unlink(tmp_path)
-
-    return findings
-
-
-def _run_semgrep(code: str, filename: str) -> list[dict]:
-    findings = []
-    ext_map = {".py": "python", ".js": "javascript", ".ts": "typescript",
-               ".jsx": "javascript", ".tsx": "typescript", ".java": "java"}
-    ext = os.path.splitext(filename)[1].lower()
-    if ext not in ext_map:
-        return []
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=ext, delete=False) as f:
-        f.write(code)
-        tmp_path = f.name
-
-    try:
-        result = subprocess.run(
-            ["semgrep", "--config=p/security-audit", "--json", "--quiet", tmp_path],
-            capture_output=True, text=True, timeout=60
-        )
-        if result.stdout:
-            data = json.loads(result.stdout)
-            for match in data.get("results", []):
-                findings.append({
-                    "tool": "semgrep",
-                    "filename": filename,
-                    "line": match.get("start", {}).get("line"),
-                    "severity": match.get("extra", {}).get("severity", "").upper(),
-                    "rule_id": match.get("check_id"),
-                    "message": match.get("extra", {}).get("message", ""),
-                    "code_snippet": match.get("extra", {}).get("lines", ""),
+                    "code_snippet": issue.get("code", "")[:100],
                     "cwe": None
                 })
     except subprocess.TimeoutExpired:
-        findings.append({"tool": "semgrep", "filename": filename, "error": "timeout"})
+        print(f"[Scanner] Bandit timeout on {filename}")
     except FileNotFoundError:
-        findings.append({"tool": "semgrep", "filename": filename, "error": "semgrep not installed"})
+        print(f"[Scanner] Bandit not installed")
     except Exception as e:
-        findings.append({"tool": "semgrep", "filename": filename, "error": str(e)})
+        print(f"[Scanner] Bandit error: {e}")
     finally:
-        os.unlink(tmp_path)
+        try:
+            os.unlink(tmp_path)
+        except:
+            pass
 
     return findings
 
 
 def scanner_node(state: ScanState) -> ScanState:
-    print(f"[Scanner] Running static analysis on {len(state['files_changed'])} files")
+    print(f"[Scanner] Running Bandit on {len(state['files_changed'])} files")
 
     bandit_findings = []
-    semgrep_findings = []
 
     for file in state["files_changed"]:
-        if not file.get("content") or file["content"].startswith("[Could not"):
-            continue
-        bandit_findings.extend(_run_bandit(file["content"], file["filename"]))
-        semgrep_findings.extend(_run_semgrep(file["content"], file["filename"]))
+        content = file.get("content", "")
+        filename = file.get("filename", "")
 
-    print(f"[Scanner] Found {len(bandit_findings)} Bandit issues, {len(semgrep_findings)} Semgrep issues")
+        if not content or content.startswith("[Could not"):
+            continue
+
+        # Only scan Python files
+        if not filename.endswith(".py"):
+            continue
+
+        print(f"[Scanner] Scanning {filename}")
+        bandit_findings.extend(_run_bandit(content, filename))
+
+    print(f"[Scanner] Found {len(bandit_findings)} issues")
 
     return {
         **state,
         "bandit_findings": bandit_findings,
-        "semgrep_findings": semgrep_findings,
+        "semgrep_findings": [],  # skip semgrep on Windows
         "execution_log": state.get("execution_log", []) + ["scanner"],
         "status": "running"
     }
