@@ -1,0 +1,14 @@
+# Never push these
+sentinelci/.env
+*.env
+.env
+
+# Python
+__pycache__/
+*.pyc
+venv/
+*.pkl
+
+# OS
+.DS_Store
+Thumbs.db

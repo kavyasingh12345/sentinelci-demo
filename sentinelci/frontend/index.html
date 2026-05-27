@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SentinelCI</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --red: #f85149;
+    --orange: #d29922;
+    --blue: #58a6ff;
+    --purple: #bc8cff;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 13px; min-height: 100vh; }
+
+  /* Header */
+  .header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .logo { font-size: 18px; font-weight: 700; color: var(--blue); letter-spacing: -0.5px; }
+  .logo span { color: var(--green); }
+  .health-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); margin-left: auto; }
+  .health-dot.online { background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .health-label { color: var(--muted); font-size: 11px; }
+
+  /* Main grid */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto 1fr; gap: 1px; background: var(--border); height: calc(100vh - 50px); }
+  .panel { background: var(--bg); padding: 16px; overflow-y: auto; }
+
+  /* Input panel */
+  .input-panel { grid-column: 1 / -1; display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .field input { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 7px 10px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; width: 160px; }
+  .field input:focus { outline: none; border-color: var(--blue); }
+  .btn { padding: 8px 18px; border: none; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; cursor: pointer; font-weight: 600; }
+  .btn-primary { background: var(--blue); color: #000; }
+  .btn-primary:hover { filter: brightness(1.15); }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-approve { background: var(--green); color: #000; }
+  .btn-changes { background: var(--orange); color: #000; }
+  .btn-escalate { background: var(--purple); color: #000; }
+
+  /* Pipeline tracker */
+  .pipeline { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin: 12px 0 0; }
+  .pipe-node { padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border); color: var(--muted); font-size: 11px; transition: all .3s; }
+  .pipe-node.active { border-color: var(--blue); color: var(--blue); }
+  .pipe-node.done { border-color: var(--green); color: var(--green); background: rgba(63,185,80,.08); }
+  .pipe-node.paused { border-color: var(--orange); color: var(--orange); animation: blink .8s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .pipe-arrow { color: var(--muted); }
+
+  /* Score display */
+  .score-big { font-size: 48px; font-weight: 700; line-height: 1; }
+  .score-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .score-green { color: var(--green); }
+  .score-yellow { color: var(--orange); }
+  .score-red { color: var(--red); }
+
+  .sev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .sev-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px; text-align: center; }
+  .sev-card .num { font-size: 22px; font-weight: 700; }
+  .sev-card .lbl { font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; }
+  .sev-critical .num { color: var(--red); }
+  .sev-high .num { color: var(--orange); }
+  .sev-medium .num { color: #e3b341; }
+  .sev-low .num { color: var(--green); }
+
+  /* Log terminal */
+  .terminal { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px; height: 240px; overflow-y: auto; font-size: 11px; line-height: 1.8; }
+  .log-line { color: var(--muted); }
+  .log-line .ts { color: var(--border); }
+  .log-line .info { color: var(--blue); }
+  .log-line .warn { color: var(--orange); }
+  .log-line .err { color: var(--red); }
+  .log-line .ok { color: var(--green); }
+
+  /* Report */
+  .report-area { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px; font-size: 12px; line-height: 1.7; white-space: pre-wrap; min-height: 200px; }
+  .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
+
+  /* HITL panel */
+  .hitl-panel { background: rgba(210,153,34,.06); border: 1px solid rgba(210,153,34,.3); border-radius: 6px; padding: 14px; display: none; }
+  .hitl-panel.visible { display: block; }
+  .hitl-title { color: var(--orange); font-weight: 700; margin-bottom: 8px; }
+  .hitl-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .hitl-input { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 7px 10px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; width: 100%; margin-top: 8px; }
+
+  /* CVE list */
+  .cve-item { background: var(--surface); border-left: 3px solid var(--red); padding: 8px 10px; margin: 6px 0; border-radius: 0 4px 4px 0; font-size: 11px; }
+  .cve-id { color: var(--red); font-weight: 700; }
+  .cve-desc { color: var(--muted); margin-top: 2px; }
+
+  .status-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-running { background: rgba(88,166,255,.1); color: var(--blue); border: 1px solid rgba(88,166,255,.3); }
+  .badge-awaiting { background: rgba(210,153,34,.1); color: var(--orange); border: 1px solid rgba(210,153,34,.3); }
+  .badge-completed { background: rgba(63,185,80,.1); color: var(--green); border: 1px solid rgba(63,185,80,.3); }
+  .badge-blocked { background: rgba(248,81,73,.1); color: var(--red); border: 1px solid rgba(248,81,73,.3); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">Sentinel<span>CI</span></div>
+  <div style="color:var(--muted);font-size:11px">AI Security Scanner</div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+    <span class="health-label" id="healthLabel">connecting...</span>
+    <div class="health-dot" id="healthDot"></div>
+  </div>
+</div>
+
+<div class="grid">
+
+  <!-- INPUT ROW -->
+  <div class="panel input-panel" style="border-bottom:1px solid var(--border)">
+    <div class="field">
+      <label>Repo Owner</label>
+      <input id="owner" placeholder="e.g. octocat" value="">
+    </div>
+    <div class="field">
+      <label>Repo Name</label>
+      <input id="repo" placeholder="e.g. hello-world" value="">
+    </div>
+    <div class="field">
+      <label>PR Number</label>
+      <input id="prNum" placeholder="e.g. 42" type="number" style="width:100px">
+    </div>
+    <div class="field">
+      <label>Reviewer ID</label>
+      <input id="reviewerId" placeholder="your name" style="width:120px">
+    </div>
+    <button class="btn btn-primary" id="scanBtn" onclick="triggerScan()">▶ Run Scan</button>
+
+    <div style="width:100%">
+      <div class="pipeline" id="pipeline">
+        <span class="pipe-node" id="node-fetcher">fetcher</span>
+        <span class="pipe-arrow">›</span>
+        <span class="pipe-node" id="node-scanner">scanner</span>
+        <span class="pipe-arrow">›</span>
+        <span class="pipe-node" id="node-cve_matcher">cve_matcher</span>
+        <span class="pipe-arrow">›</span>
+        <span class="pipe-node" id="node-ai_reasoner">ai_reasoner</span>
+        <span class="pipe-arrow">›</span>
+        <span class="pipe-node" id="node-hitl">hitl</span>
+        <span class="pipe-arrow">›</span>
+        <span class="pipe-node" id="node-reporter">reporter</span>
+        <span style="margin-left:12px" id="statusBadge"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEFT: Score + Severities + Log -->
+  <div class="panel">
+    <div class="section-title">Security Score</div>
+    <div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:16px">
+      <div>
+        <div class="score-big score-green" id="scoreDisplay">—</div>
+        <div class="score-label">/ 10</div>
+      </div>
+      <div style="font-size:12px;color:var(--muted)" id="scoreLabel">Run a scan to start</div>
+    </div>
+
+    <div class="sev-grid">
+      <div class="sev-card sev-critical"><div class="num" id="sevCritical">0</div><div class="lbl">Critical</div></div>
+      <div class="sev-card sev-high"><div class="num" id="sevHigh">0</div><div class="lbl">High</div></div>
+      <div class="sev-card sev-medium"><div class="num" id="sevMedium">0</div><div class="lbl">Medium</div></div>
+      <div class="sev-card sev-low"><div class="num" id="sevLow">0</div><div class="lbl">Low</div></div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="section-title">Live Intelligence Feed</div>
+      <div class="terminal" id="logTerminal">
+        <div class="log-line"><span class="ts">[00:00:00]</span> SentinelCI ready. Enter PR details and click Run Scan.</div>
+      </div>
+    </div>
+
+    <!-- CVE Findings -->
+    <div style="margin-top:16px" id="cveSection" style="display:none">
+      <div class="section-title">Vulnerable Dependencies (CVEs)</div>
+      <div id="cveList"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Report + HITL -->
+  <div class="panel">
+    <div class="section-title">Review Output</div>
+
+    <!-- HITL Panel -->
+    <div class="hitl-panel" id="hitlPanel">
+      <div class="hitl-title">⚠ Human Review Required</div>
+      <div style="color:var(--text);font-size:12px" id="hitlMessage">High security score detected. Please review the findings and make a decision.</div>
+      <input class="hitl-input" id="hitlComment" placeholder="Optional: add a comment (e.g. 'Reviewed — false positive on line 42')">
+      <div class="hitl-actions">
+        <button class="btn btn-approve" onclick="submitHITL('approve')">✅ Approve</button>
+        <button class="btn btn-changes" onclick="submitHITL('request_changes')">🔄 Request Changes</button>
+        <button class="btn btn-escalate" onclick="submitHITL('escalate')">📢 Escalate</button>
+      </div>
+    </div>
+
+    <div class="report-area" id="reportArea" style="margin-top:12px;color:var(--muted)">
+      Scan results will appear here...
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+let currentThread = null;
+let pollInterval = null;
+const NODES = ['fetcher', 'scanner', 'cve_matcher', 'ai_reasoner', 'hitl', 'reporter'];
+
+// Health check on load
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/health`);
+    if (r.ok) {
+      document.getElementById('healthDot').classList.add('online');
+      document.getElementById('healthLabel').textContent = 'backend online';
+    }
+  } catch {
+    document.getElementById('healthLabel').textContent = 'backend offline';
+  }
+}
+checkHealth();
+
+function log(msg, type = 'info') {
+  const terminal = document.getElementById('logTerminal');
+  const now = new Date().toTimeString().slice(0,8);
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="ts">[${now}]</span> <span class="${type}">${msg}</span>`;
+  terminal.appendChild(line);
+  terminal.scrollTop = terminal.scrollHeight;
+}
+
+function updatePipeline(executionLog, status) {
+  NODES.forEach(node => {
+    const el = document.getElementById(`node-${node}`);
+    if (!el) return;
+    el.className = 'pipe-node';
+    if (executionLog.includes(node)) {
+      el.classList.add('done');
+    } else if (status === 'awaiting_human' && node === 'hitl') {
+      el.classList.add('paused');
+    } else if (executionLog.length > 0 && node === NODES[executionLog.length]) {
+      el.classList.add('active');
+    }
+  });
+}
+
+function updateScore(score, breakdown) {
+  const el = document.getElementById('scoreDisplay');
+  el.textContent = score;
+  el.className = 'score-big';
+  if (score <= 3) { el.classList.add('score-green'); document.getElementById('scoreLabel').textContent = 'Clean — good to merge'; }
+  else if (score <= 6) { el.classList.add('score-yellow'); document.getElementById('scoreLabel').textContent = 'Medium — review recommended'; }
+  else { el.classList.add('score-red'); document.getElementById('scoreLabel').textContent = 'High risk — block until reviewed'; }
+
+  document.getElementById('sevCritical').textContent = breakdown.critical || 0;
+  document.getElementById('sevHigh').textContent = breakdown.high || 0;
+  document.getElementById('sevMedium').textContent = breakdown.medium || 0;
+  document.getElementById('sevLow').textContent = breakdown.low || 0;
+}
+
+function updateStatusBadge(status) {
+  const el = document.getElementById('statusBadge');
+  const map = {
+    running: ['badge-running', '⟳ Running'],
+    awaiting_human: ['badge-awaiting', '⏸ Awaiting Review'],
+    completed: ['badge-completed', '✓ Completed'],
+    blocked: ['badge-blocked', '⛔ Blocked'],
+    changes_requested: ['badge-awaiting', '🔄 Changes Requested']
+  };
+  const [cls, label] = map[status] || ['badge-running', status];
+  el.innerHTML = `<span class="status-badge ${cls}">${label}</span>`;
+}
+
+function renderCVEs(cves) {
+  if (!cves.length) return;
+  const section = document.getElementById('cveSection');
+  section.style.display = 'block';
+  const list = document.getElementById('cveList');
+  list.innerHTML = cves.map(c => `
+    <div class="cve-item">
+      <span class="cve-id">${c.cve_id}</span> — <code>${c.package}@${c.version_in_use}</code> | CVSS: ${c.cvss_score} | ${c.severity}
+      <div class="cve-desc">${c.description.slice(0,200)}</div>
+    </div>`).join('');
+}
+
+async function triggerScan() {
+  const owner = document.getElementById('owner').value.trim();
+  const repo = document.getElementById('repo').value.trim();
+  const prNum = parseInt(document.getElementById('prNum').value);
+
+  if (!owner || !repo || !prNum) { alert('Fill in all fields'); return; }
+
+  document.getElementById('scanBtn').disabled = true;
+  document.getElementById('hitlPanel').classList.remove('visible');
+  document.getElementById('reportArea').textContent = 'Scan running...';
+  document.getElementById('cveSection').style.display = 'none';
+
+  // Reset pipeline UI
+  NODES.forEach(n => { const el = document.getElementById(`node-${n}`); if(el) el.className = 'pipe-node'; });
+
+  log(`Triggering scan for ${owner}/${repo} PR #${prNum}`, 'info');
+
+  try {
+    const r = await fetch(`${API}/scan/trigger`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({repo_owner: owner, repo_name: repo, pr_number: prNum})
+    });
+    const data = await r.json();
+    currentThread = data.thread_id;
+    log(`Scan started — thread: ${currentThread}`, 'ok');
+    startPolling();
+  } catch (e) {
+    log(`Failed to start scan: ${e.message}`, 'err');
+    document.getElementById('scanBtn').disabled = false;
+  }
+}
+
+function startPolling() {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(pollStatus, 2000);
+}
+
+let lastLog = 0;
+async function pollStatus() {
+  if (!currentThread) return;
+  try {
+    const r = await fetch(`${API}/scan/${currentThread}`);
+    if (!r.ok) return;
+    const data = await r.json();
+
+    // Update pipeline
+    updatePipeline(data.execution_log || [], data.status);
+    updateStatusBadge(data.status);
+
+    // Log new nodes
+    const log_items = data.execution_log || [];
+    if (log_items.length > lastLog) {
+      for (let i = lastLog; i < log_items.length; i++) {
+        log(`Node completed: ${log_items[i]}`, 'ok');
+      }
+      lastLog = log_items.length;
+    }
+
+    // Update score when ai_reasoner runs
+    if (data.security_score > 0) {
+      updateScore(data.security_score, data.severity_breakdown || {});
+    }
+
+    // Show CVEs
+    if (data.cve_findings?.length) renderCVEs(data.cve_findings);
+
+    // Show report
+    if (data.final_report_markdown) {
+      document.getElementById('reportArea').textContent = data.final_report_markdown;
+    } else if (data.ai_analysis) {
+      document.getElementById('reportArea').textContent = data.ai_analysis;
+    }
+
+    // HITL
+    if (data.status === 'awaiting_human' && data.hitl_required) {
+      log(`⚠ Human review required — score: ${data.security_score}/10`, 'warn');
+      document.getElementById('hitlPanel').classList.add('visible');
+      document.getElementById('hitlMessage').textContent =
+        `Security score ${data.security_score}/10 detected. Review findings and decide.`;
+    }
+
+    // Terminal states
+    if (['completed', 'blocked', 'changes_requested'].includes(data.status)) {
+      clearInterval(pollInterval);
+      document.getElementById('scanBtn').disabled = false;
+      log(`Scan ${data.status}. Score: ${data.security_score}/10`, data.status === 'completed' ? 'ok' : 'warn');
+      if (data.github_comment_url) {
+        log(`GitHub comment: ${data.github_comment_url}`, 'info');
+      }
+      lastLog = 0;
+    }
+
+    if (data.error) log(`Error: ${data.error}`, 'err');
+
+  } catch(e) {
+    log(`Poll error: ${e.message}`, 'err');
+  }
+}
+
+async function submitHITL(decision) {
+  const reviewer = document.getElementById('reviewerId').value.trim() || 'anonymous';
+  const comment = document.getElementById('hitlComment').value.trim();
+
+  log(`Submitting HITL decision: ${decision}`, 'info');
+
+  try {
+    const r = await fetch(`${API}/hitl/respond`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({thread_id: currentThread, decision, reviewer_id: reviewer, comment})
+    });
+    const data = await r.json();
+    log(data.message, 'ok');
+    document.getElementById('hitlPanel').classList.remove('visible');
+    startPolling();
+  } catch(e) {
+    log(`HITL error: ${e.message}`, 'err');
+  }
+}
+</script>
+</body>
+</html>
