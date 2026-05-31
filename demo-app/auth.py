@@ -1,3 +1,4 @@
+# Authentication module v2
 import subprocess
 import sqlite3
 import hashlib
