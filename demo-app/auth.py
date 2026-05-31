@@ -3,26 +3,36 @@ import subprocess
 import sqlite3
 import hashlib
 import pickle
+import os
 
-# Intentionally vulnerable code for SentinelCI demo
-
-SECRET_KEY = "admin123"          # Hardcoded credential
+# Vulnerability 1: Hardcoded credentials
+SECRET_KEY = "admin123"
 DB_PASSWORD = "root"
+API_KEY = "sk-prod-abc123xyz789"
 
+# Vulnerability 2: SQL Injection
 def get_user(username):
     conn = sqlite3.connect("users.db")
-    # SQL Injection vulnerability
     query = "SELECT * FROM users WHERE username = '" + username + "'"
     return conn.execute(query)
 
+# Vulnerability 3: Command Injection  
 def ping_host(host):
-    # Command injection vulnerability
     subprocess.call("ping -c 1 " + host, shell=True)
 
+# Vulnerability 4: Unsafe Deserialization
 def load_session(data):
-    # Unsafe deserialization
     return pickle.loads(data)
 
+# Vulnerability 5: Weak Hashing
 def hash_password(password):
-    # Weak hashing algorithm
     return hashlib.md5(password.encode()).hexdigest()
+
+# Vulnerability 6: Path Traversal
+def read_file(filename):
+    return open("/var/data/" + filename).read()
+
+# Vulnerability 7: Hardcoded token
+def get_admin():
+    token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.admin"
+    return token
