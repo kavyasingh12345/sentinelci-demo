@@ -8,7 +8,7 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")
 if LLM_PROVIDER == "gemini":
     from langchain_google_genai import ChatGoogleGenerativeAI
     llm = ChatGoogleGenerativeAI(
-        model=os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
+        model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
         google_api_key=os.getenv("GOOGLE_API_KEY"),
         temperature=0.1
     )
@@ -17,6 +17,13 @@ elif LLM_PROVIDER == "anthropic":
     llm = ChatAnthropic(
         model=os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-20241022"),
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+        temperature=0.1
+    )
+elif LLM_PROVIDER == "groq":
+    from langchain_groq import ChatGroq
+    llm = ChatGroq(
+        model="llama-3.3-70b-versatile",
+        groq_api_key=os.getenv("GROQ_API_KEY"),
         temperature=0.1
     )
 else:

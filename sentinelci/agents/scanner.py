@@ -16,7 +16,7 @@ def _run_bandit(code: str, filename: str) -> list[dict]:
 
     try:
         result = subprocess.run(
-            ["bandit", "-f", "json", "-q", tmp_path],
+            ["python", "-m", "bandit", "-f", "json", "-q", tmp_path],
             capture_output=True, text=True, timeout=20,
             encoding="utf-8", errors="replace"
         )
