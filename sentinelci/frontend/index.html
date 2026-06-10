@@ -34,6 +34,17 @@
   .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto 1fr; gap: 1px; background: var(--border); height: calc(100vh - 50px); }
   .panel { background: var(--bg); padding: 16px; overflow-y: auto; }
 
+  .history-item {
+    padding: 4px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .history-item:hover {
+      border-color: var(--blue);
+  }
   /* Input panel */
   .input-panel { grid-column: 1 / -1; display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
   .field { display: flex; flex-direction: column; gap: 4px; }
@@ -117,6 +128,11 @@
 </div>
 
 <div class="grid">
+  <div style="padding:10px 24px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Recent Scans:</span>
+    <div id="scanHistory" style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px"></div>
+    <button onclick="loadHistory()" style="margin-left:auto;padding:4px 10px;font-size:11px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:4px;cursor:pointer">Refresh</button>
+  </div>
 
   <!-- INPUT ROW -->
   <div class="panel input-panel" style="border-bottom:1px solid var(--border)">
@@ -216,6 +232,34 @@ const API = 'https://sentinelci-demo.onrender.com';
 let currentThread = null;
 let pollInterval = null;
 const NODES = ['fetcher', 'scanner', 'cve_matcher', 'ai_reasoner', 'hitl', 'reporter'];
+async function loadHistory() {
+    try {
+        const r = await fetch(`${API}/scans/history`);
+        const data = await r.json();
+        const scans = data.scans || [];
+        const historyDiv = document.getElementById('scanHistory');
+        if (scans.length === 0) {
+            historyDiv.innerHTML = '<div style="color:var(--muted);font-size:12px">No recent scans</div>';
+            return;
+        }
+        // Show most recent first
+        historyDiv.innerHTML = scans.reverse().map(s => `
+            <div class="history-item" onclick="loadScan('${s.thread_id}')">
+                <span style="color:var(--blue)">${s.repo}</span>
+                <span style="color:var(--text)"> PR #${s.pr_number}</span>
+                <span style="color:var(--muted);font-size:11px"> — ${s.started_at.slice(11,19)}</span>
+            </div>
+        `).join('');
+    } catch(e) {
+        console.log('History load failed:', e);
+    }
+}
+
+async function loadScan(threadId) {
+    currentThread = threadId;
+    log(`Loading scan: ${threadId}`, 'info');
+    startPolling();
+}
 
 // Health check on load
 async function checkHealth() {
@@ -230,6 +274,8 @@ async function checkHealth() {
   }
 }
 checkHealth();
+loadHistory();
+setInterval(loadHistory, 10000);
 
 function log(msg, type = 'info') {
   const terminal = document.getElementById('logTerminal');

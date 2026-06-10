@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from state import ScanRequest, HITLResponse
 from graph import app_graph
 from config import WEBHOOK_SECRET
-
+scan_history = []  # stores recent scan thread_ids
 
 app = FastAPI(title="SentinelCI", version="1.0.0")
 
@@ -21,6 +21,15 @@ app.add_middleware(
 )
 
 def run_scan(thread_id: str, initial_state: dict):
+    scan_history.append({
+        "thread_id": thread_id,
+        "repo": f"{initial_state.get('repo_owner')}/{initial_state.get('repo_name')}",
+        "pr_number": initial_state.get("pr_number"),
+        "started_at": str(__import__('datetime').datetime.now())
+    })
+    if len(scan_history) > 20:  # keep only last 20
+        scan_history.pop(0)
+    config = {"configurable": {"thread_id": thread_id}}
     config = {"configurable": {"thread_id": thread_id}}
     try:
         print(f"[RunScan] Starting thread: {thread_id}", flush=True)
@@ -64,6 +73,11 @@ def make_initial_state(repo_owner, repo_name, pr_number, commit_sha, thread_id):
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "SentinelCI"}
+
+
+@app.get("/scans/history")
+def get_scan_history():
+    return {"scans": scan_history}
 
 
 @app.post("/scan/trigger")
