@@ -159,9 +159,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     ).hexdigest()
 
     if not hmac.compare_digest(signature, expected):
-        print(f"[Webhook] Signature mismatch! Got: {signature[:30]} Expected: {expected[:30]}")
-        # temporarily allow for debugging
-        # raise HTTPException(401, "Invalid webhook signature")
+        raise HTTPException(401, "Invalid webhook signature")
 
     payload = json.loads(body)
     event = request.headers.get("X-GitHub-Event")
