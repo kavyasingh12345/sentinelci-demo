@@ -2,7 +2,7 @@ import hashlib
 import hmac
 import json
 import uuid
-import os
+import threading
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,10 +10,6 @@ from state import ScanRequest, HITLResponse
 from graph import app_graph
 from config import WEBHOOK_SECRET
 
-import sys
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 app = FastAPI(title="SentinelCI", version="1.0.0")
 
@@ -27,13 +23,15 @@ app.add_middleware(
 def run_scan(thread_id: str, initial_state: dict):
     config = {"configurable": {"thread_id": thread_id}}
     try:
+        print(f"[RunScan] Starting thread: {thread_id}", flush=True)
         for event in app_graph.stream(initial_state, config=config):
             node_name = list(event.keys())[0] if event else "unknown"
-            print(f"[Graph] Node completed: {node_name}")
+            print(f"[Graph] Node completed: {node_name}", flush=True)
+        print(f"[RunScan] Completed: {thread_id}", flush=True)
     except Exception as e:
         import traceback
-        print(f"[Graph] Pipeline error: {e}")
-        print(traceback.format_exc())
+        print(f"[Graph] Pipeline error: {e}", flush=True)
+        print(traceback.format_exc(), flush=True)
 
 def make_initial_state(repo_owner, repo_name, pr_number, commit_sha, thread_id):
     return {
@@ -75,7 +73,9 @@ async def trigger_scan(request: ScanRequest, background_tasks: BackgroundTasks):
         request.repo_owner, request.repo_name,
         request.pr_number, "", thread_id
     )
-    background_tasks.add_task(run_scan, thread_id, initial_state)
+    t = threading.Thread(target=run_scan, args=(thread_id, initial_state))
+    t.daemon = True
+    t.start()
     return {
         "thread_id": thread_id,
         "message": "Scan started",
@@ -160,8 +160,8 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
 
     if not hmac.compare_digest(signature, expected):
         print(f"[Webhook] Signature mismatch! Got: {signature[:30]} Expected: {expected[:30]}")
-    # temporarily allow for debugging
-    # raise HTTPException(401, "Invalid webhook signature")
+        # temporarily allow for debugging
+        # raise HTTPException(401, "Invalid webhook signature")
 
     payload = json.loads(body)
     event = request.headers.get("X-GitHub-Event")
@@ -183,9 +183,12 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         pr.get("number"),
         pr.get("head", {}).get("sha", ""),
         thread_id
-    )
-
-    background_tasks.add_task(run_scan, thread_id, initial_state)
+        )
+    print(f"[Webhook] Starting thread for PR#{pr.get('number')}", flush=True)
+    t = threading.Thread(target=run_scan, args=(thread_id, initial_state))
+    t.daemon = True
+    t.start()
+    print(f"[Webhook] Thread started: {thread_id}", flush=True)
     return {"message": "Scan triggered", "thread_id": thread_id}
 
 
