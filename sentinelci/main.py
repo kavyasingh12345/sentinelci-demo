@@ -24,14 +24,8 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-
 def run_scan(thread_id: str, initial_state: dict):
     config = {"configurable": {"thread_id": thread_id}}
-    print(f"[Graph] Starting scan thread: {thread_id}")
-    print(f"[Graph] Repo: {initial_state.get('repo_owner')}/{initial_state.get('repo_name')} PR#{initial_state.get('pr_number')}")
-    print(f"[Graph] GITHUB_TOKEN set: {bool(os.getenv('GITHUB_TOKEN'))}")
-    print(f"[Graph] GROQ_API_KEY set: {bool(os.getenv('GROQ_API_KEY'))}")
-    print(f"[Graph] WEBHOOK_SECRET: {os.getenv('WEBHOOK_SECRET')}")
     try:
         for event in app_graph.stream(initial_state, config=config):
             node_name = list(event.keys())[0] if event else "unknown"
